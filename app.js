@@ -9,7 +9,19 @@ const path = require("path");
 const methodOverride = require("method-override");
 const ejsMate = require("ejs-mate");
 const ExpressError = require("./utils/ExpressError.js");
-const {listeningSchema , reviewSchema } = require("./schema.js");
+
+const dbUrl = process.env.ATLASDB_URL;
+
+main()
+.then(() => {
+    console.log("Connected to DB");
+}).catch((err) => {
+    console.log(err);
+});
+
+async function main() {
+    await mongoose.connect(dbUrl);
+}
 
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
@@ -19,12 +31,11 @@ const session = require("express-session");
 const MongoStore = require('connect-mongo');
 const flash = require("connect-flash");
 
-const dbUrl = process.env.ATLASDB_URL;
 
 const store = MongoStore.create({
     mongoUrl:dbUrl,
     crypto: {
-        secret:"mysupersecreatecode"
+        secret:process.env.SECRETE
     },
     touchAfter: 24 * 3600,
 });
@@ -35,7 +46,7 @@ store.on("error",() => {
 
 const sessionOption = {
     store:store,
-    secret : "mysupersecreatecode",
+    secret : process.env.SECRETE,
     resave:false,
     saveUninitialized:true,
     cookie : {
@@ -55,18 +66,6 @@ app.use(express.static(path.join(__dirname,"public")));
 app.engine('ejs',ejsMate);
 
 
-main()
-.then(() => {
-    console.log("Connected to DB");
-}).catch((err) => {
-    console.log(err);
-});
-
-async function main() {
-    await mongoose.connect(dbUrl);
-}
-
-
 app.use(session(sessionOption));
 app.use(flash());
 
@@ -84,46 +83,10 @@ app.use((req,res,next) => {
     next();
 });
 
-// demo user
-// app.get("/demouser",async (req,res) => {
-//     const fakeUser = new User({
-//         email:"student@gmail.com",
-//         username:"sigma-student"
-//     });
-
-//     // register is a static method
-//     let registerUser = await User.register(fakeUser,"helloworld");
-    
-//     res.send(registerUser);
-//     console.log(registerUser);
-// })
 
 const listingRouter = require("./route/listing.js");
 const reviewRouter = require("./route/review.js");
 const userRouter = require("./route/user.js");
-
-let validateListing = (req,res,next) => {
-    const {error} = listeningSchema.validate(req.body);
-    // console.log(result);
-    if(error) {
-        let errMsg = error.details.map((el) => el.message).join(",");
-  
-         throw new ExpressError(400,errMsg);
-    } else {
-        next();
-    }
-};
-
-let validateReview = (req,res,next) => {
-    const {error} = reviewSchema.validate(req.body);
-    if(error) {
-        let errMsg = error.details.map((el) => el.message).join(",");
-         throw new ExpressError(400,errMsg);
-    } else {
-        next();
-    }
-};
-
 
 app.use("/listings",listingRouter);
 app.use("/listings/:id/reviews",reviewRouter);
